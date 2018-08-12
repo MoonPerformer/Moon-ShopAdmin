@@ -16,8 +16,6 @@
     </div>
 </template>
 <script>
-import axios from 'axios'
-
 export default {
   data () {
     return {
@@ -41,11 +39,11 @@ export default {
     submitForm () {
       this.$refs.formData.validate(vaild => {
         if (vaild) {
-          axios.post('http://localhost:8888/api/private/v1/login', this.form).then(res => {
-            if (res.data.meta.status === 200) {
+          this.axios.post('login', this.form).then(res => {
+            const {data, meta} = res.data
+            if (meta.status === 200) {
               this.$message.success('登陆成功,欢迎您的到来')
-              console.log(res.data)
-              localStorage.setItem('shop_token', res.data.data.token)
+              localStorage.setItem('shop_token', data.token)
               this.$router.push('home')
             } else {
               this.$message.error('用户名或密码错误')
@@ -83,7 +81,7 @@ export default {
             height: 120px;
             border-radius: 50%;
             position: absolute;
-            border: 2px solid #fff;
+            border: 3px solid #fff;
             top: -24%;
             left: 50%;
             transform: translateX(-50%);

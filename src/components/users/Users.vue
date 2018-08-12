@@ -11,7 +11,7 @@
       <el-button slot="append" icon="el-icon-search" @click="searchList"></el-button>
     </el-input>
     <!-- 添加按钮 -->
-    <el-button type="success" size="middle" plain>增加用户</el-button>
+    <el-button type="success" size="middle" plain @click="showAddDialog">增加用户</el-button>
     <!-- 表格 -->
     <el-table
       :data="usersList"
@@ -40,15 +40,16 @@
           <el-switch
             v-model="scope.row.mg_state"
             active-color="#13ce66"
-            inactive-color="#ff4949">
+            inactive-color="#ff4949"
+            @change="changeState(scope.row)">
           </el-switch>
         </template>
       </el-table-column>
       <el-table-column
         label="操作">
           <template slot-scope="scope">
-            <el-button type="primary" size="small" plain icon="el-icon-edit"></el-button>
-            <el-button type="danger" size="small" plain icon="el-icon-delete"></el-button>
+            <el-button type="primary" size="small" plain icon="el-icon-edit" @click="showEditDailog(scope.row)"></el-button>
+            <el-button type="danger" size="small" plain icon="el-icon-delete" @click="deleteUser(scope.row)"></el-button>
             <el-button type="success" size="small" plain icon="el-icon-check">分配角色</el-button>
          </template>
       </el-table-column>
@@ -64,14 +65,87 @@
       @size-change="handleSizeChange"
       @current-change="handleCurrentChange">
     </el-pagination>
+    <!-- 添加用户对话框 -->
+    <el-dialog
+      title="增加用户"
+      :visible.sync="addDialogVisible"
+      width="40%">
+      <el-form :model="addForm" :rules="addRules" ref="addForm" label-width="70px">
+          <el-form-item label="用户名" prop="username">
+              <el-input v-model="addForm.username"></el-input>
+          </el-form-item>
+          <el-form-item label="密码" prop="password">
+              <el-input v-model="addForm.password"></el-input>
+          </el-form-item>
+          <el-form-item label="邮箱" prop="email">
+              <el-input v-model="addForm.email"></el-input>
+          </el-form-item>
+          <el-form-item label="手机号" prop="mobile">
+              <el-input v-model="addForm.mobile"></el-input>
+          </el-form-item>
+      </el-form>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="addDialogVisible = false">取 消</el-button>
+        <el-button type="primary" @click="addUser">确 定</el-button>
+      </span>
+    </el-dialog>
+    <!-- 修改用户对话框 -->
+    <el-dialog
+      title="修改用户"
+      :visible.sync="editDialogVisible"
+      width="40%">
+      <el-form :model="editForm" :rules="addRules" ref="editForm" label-width="70px">
+          <el-form-item label="用户名">
+              <el-tag type="info">{{editForm.username}}</el-tag>
+          </el-form-item>
+          <el-form-item label="邮箱" prop="email">
+              <el-input v-model="editForm.email"></el-input>
+          </el-form-item>
+          <el-form-item label="手机号" prop="mobile">
+              <el-input v-model="editForm.mobile"></el-input>
+          </el-form-item>
+      </el-form>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="editDialogVisible = false">取 消</el-button>
+        <el-button type="primary" @click="editUser">确 定</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 <script>
-import axios from 'axios'
-
 export default {
   data () {
     return {
+      addForm: {
+        username: '',
+        password: '',
+        email: '',
+        mobile: ''
+      },
+      editForm: {
+        username: '',
+        email: '',
+        mobile: '',
+        id: ''
+      },
+      addRules: {
+        username: [
+          {required: true, message: '请输入用户名', trigger: 'blur'},
+          {min: 3, max: 6, message: '长度在 3 到 6 个字符', trigger: 'blur'}
+        ],
+        password: [
+          {required: true, message: '请输入密码', trigger: 'blur'},
+          {min: 6, max: 12, message: '长度在 6 到 12 个字符', trigger: 'blur'}
+        ],
+        email: [
+          {type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur'}
+        ],
+        mobile: [
+          {pattern: /^1\d{10}$/, message: '请输入正确的手机号格式', trigger: 'blur'}
+        ]
+      },
+      addDialogVisible: false,
+      editDialogVisible: false,
       total: 0,
       query: '',
       current: 1,
@@ -80,36 +154,131 @@ export default {
     }
   },
   methods: {
-    getList () {
-      axios({
+    async getList () {
+      const res = await this.axios({
         method: 'get',
-        url: 'http://localhost:8888/api/private/v1/users',
+        url: 'users',
         params: {
           query: this.query,
           pagenum: this.current,
           pagesize: this.pageSize
-        },
-        headers: {
-          'Authorization': localStorage.getItem('shop_token')
         }
-      }).then(res => {
-        this.usersList = res.data.data.users
-        this.total = res.data.data.total
       })
+      const {data, meta} = res.data
+      if (meta.status === 200) {
+        this.usersList = data.users
+        this.total = data.total
+      }
     },
+    // 改变每页条数
     handleSizeChange (val) {
       this.pageSize = val
       this.current = 1
       this.getList()
     },
+    // 改变当前页
     handleCurrentChange (val) {
       this.current = val
       this.getList()
     },
+    // 搜索功能
     searchList () {
+      this.current = 1
       this.getList()
+    },
+    // 展示添加对话框
+    showAddDialog () {
+      this.addDialogVisible = true
+    },
+    // 展示修改对话框
+    showEditDailog (user) {
+      this.editDialogVisible = true
+      this.editForm.id = user.id
+      this.editForm.username = user.username
+      this.editForm.email = user.email
+      this.editForm.mobile = user.mobile
+    },
+    // 添加用户
+    addUser () {
+      this.$refs.addForm.validate(valid => {
+        if (valid) {
+          this.axios.post('users', this.addForm).then(res => {
+            const {meta} = res.data
+            if (meta.status === 201) {
+              this.addDialogVisible = false
+              this.$refs.addForm.resetFields()
+              this.total++
+              this.current = Math.ceil(this.total / this.pageSize)
+              this.getList()
+              this.$message.success('用户添加成功')
+            } else {
+              this.$message.error(meta.msg)
+            }
+          })
+        } else {
+          return false
+        }
+      })
+    },
+    // 修改用户
+    editUser () {
+      this.$refs.editForm.validate(valid => {
+        if (valid) {
+          this.axios.put(`users/${this.editForm.id}`, this.editForm).then(res => {
+            const {meta} = res.data
+            if (meta.status === 200) {
+              this.editDialogVisible = false
+              this.$refs.editForm.resetFields()
+              this.getList()
+              this.$message.success('用户修改成功')
+            } else {
+              this.$message.error('用户修改失败')
+            }
+          })
+        } else {
+          return false
+        }
+      })
+    },
+    // 修改用户状态
+    changeState (user) {
+      this.axios.put(`users/${user.id}/state/${user.mg_state}`).then(res => {
+        const {meta: {status}} = res.data
+        if (status === 200) {
+          this.$message.success('用户状态修改成功')
+        } else {
+          this.$message.error('用户状态修改失败')
+        }
+      })
+    },
+    // 删除用户
+    deleteUser (user) {
+      this.$confirm('您确定要删除该用户吗?', '温馨提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.axios.delete(`users/${user.id}`).then(res => {
+          const {meta: {status}} = res.data
+          if (status === 200) {
+            if (this.usersList.length === 1) {
+              this.current--
+            }
+            this.getList()
+            this.$message.success('删除成功!')
+          } else {
+            this.$message.error('删除失败!')
+          }
+        })
+      }).catch(() => {
+        this.$message({
+          type: 'info',
+          message: '删除已取消'
+        })
+      })
     }
   },
+  // 钩子函数
   created () {
     this.getList()
   }
