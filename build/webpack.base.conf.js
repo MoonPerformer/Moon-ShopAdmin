@@ -77,6 +77,17 @@ module.exports = {
       }
     ]
   },
+  externals: {
+    // vue: 表示的是包名
+    // Vue:表示一个全局变量
+    'vue': 'Vue',
+    'vue-router': 'VueRouter',
+    'moment': 'moment',
+    'element-ui': 'ELEMENT',
+    'axios': 'axios'
+    // import Vue from 'vue'
+    // import Router from 'vue-router'
+  },
   node: {
     // prevent webpack from injecting useless setImmediate polyfill because Vue
     // source contains it (although only uses it if it's native).

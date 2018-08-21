@@ -13,34 +13,25 @@
                 <el-aside width="200px">
                     <el-menu
                         router
-                        default-active="1-1"
+                        :default-active="$route.path.slice(1).split('-')[0]"
                         unique-opened
                         class="el-menu-vertical-demo"
                         background-color="#545c64"
                         text-color="#fff"
                         active-text-color="#ffd04b">
-                        <el-submenu index="1">
+                        <!-- 一级菜单 -->
+                        <el-submenu
+                        v-for="level1 in menuList"
+                        :index="level1.path"
+                        :key="level1.id">
                             <template slot="title">
                                 <i class="el-icon-location"></i>
-                                <span>用户管理</span>
+                                <span>{{level1.authName}}</span>
                             </template>
-                            <el-menu-item index="users">
+                            <!-- 二级菜单 -->
+                            <el-menu-item v-for="level2 in level1.children" :key="level2.id" :index="level2.path">
                                 <i class="el-icon-menu"></i>
-                                <span slot="title">用户列表</span>
-                            </el-menu-item>
-                        </el-submenu>
-                        <el-submenu index="2">
-                            <template slot="title">
-                                <i class="el-icon-location"></i>
-                                <span>权限管理</span>
-                            </template>
-                            <el-menu-item index="2-1">
-                                <i class="el-icon-menu"></i>
-                                <span slot="title">角色列表</span>
-                            </el-menu-item>
-                            <el-menu-item index="2-2">
-                                <i class="el-icon-menu"></i>
-                                <span slot="title">权限列表</span>
+                                <span slot="title">{{level2.authName}}</span>
                             </el-menu-item>
                         </el-submenu>
                     </el-menu>
@@ -54,26 +45,44 @@
 </template>
 <script>
 export default {
+  data () {
+    return {
+      menuList: []
+    }
+  },
   methods: {
-    logout () {
-      this.$confirm('您确定要退出本系统吗?', '温馨提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
+    // 退出功能
+    async logout () {
+      try {
+        await this.$confirm('您确定要退出本系统吗?', '温馨提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
         localStorage.removeItem('shop_token')
         this.$router.push('login')
         this.$message({
           type: 'success',
           message: '退出成功!'
         })
-      }).catch(() => {
+      } catch (e) {
         this.$message({
           type: 'info',
           message: '退出已取消'
         })
-      })
+      }
+    },
+    // 获取左侧菜单列表
+    async getMenus () {
+      const res = await this.axios.get('menus')
+      const {meta, data} = res.data
+      if (meta.status === 200) {
+        this.menuList = data
+      }
     }
+  },
+  created () {
+    this.getMenus()
   }
 }
 </script>
@@ -92,12 +101,13 @@ export default {
                 height: 60px;
                 width: 180px;
                 background: url('../../assets/logo.png') no-repeat center;
-                background-size: contain;
+                background-size: 100% 100%;
             }
             .title {
                 height: 60px;
                 overflow: hidden;
                 line-height: 60px;
+                font-weight: 700;
                 font-size: 28px;
                 color: #fff;
                 text-align: center;

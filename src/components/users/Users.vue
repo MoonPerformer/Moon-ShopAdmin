@@ -11,12 +11,13 @@
       <el-button slot="append" icon="el-icon-search" @click="searchList"></el-button>
     </el-input>
     <!-- 添加按钮 -->
-    <el-button type="success" size="middle" plain @click="showAddDialog">增加用户</el-button>
+    <el-button type="success" size="middle" plain @click="showAddDialog">添加用户</el-button>
     <!-- 表格 -->
     <el-table
       :data="usersList"
       border
-      style="width: 100%">
+      style="width: 100%"
+      class="userTable">
       <el-table-column
         prop="username"
         label="姓名"
@@ -50,7 +51,7 @@
           <template slot-scope="scope">
             <el-button type="primary" size="small" plain icon="el-icon-edit" @click="showEditDailog(scope.row)"></el-button>
             <el-button type="danger" size="small" plain icon="el-icon-delete" @click="deleteUser(scope.row)"></el-button>
-            <el-button type="success" size="small" plain icon="el-icon-check">分配角色</el-button>
+            <el-button type="success" size="small" plain icon="el-icon-check" @click="showAssignDailog(scope.row)">分配角色</el-button>
          </template>
       </el-table-column>
     </el-table>
@@ -67,10 +68,10 @@
     </el-pagination>
     <!-- 添加用户对话框 -->
     <el-dialog
-      title="增加用户"
+      title="添加用户"
       :visible.sync="addDialogVisible"
       width="40%">
-      <el-form :model="addForm" :rules="addRules" ref="addForm" label-width="70px">
+      <el-form :model="addForm" :rules="rules" ref="addForm" label-width="70px">
           <el-form-item label="用户名" prop="username">
               <el-input v-model="addForm.username"></el-input>
           </el-form-item>
@@ -94,7 +95,7 @@
       title="修改用户"
       :visible.sync="editDialogVisible"
       width="40%">
-      <el-form :model="editForm" :rules="addRules" ref="editForm" label-width="70px">
+      <el-form :model="editForm" :rules="rules" ref="editForm" label-width="70px">
           <el-form-item label="用户名">
               <el-tag type="info">{{editForm.username}}</el-tag>
           </el-form-item>
@@ -108,6 +109,26 @@
       <span slot="footer" class="dialog-footer">
         <el-button @click="editDialogVisible = false">取 消</el-button>
         <el-button type="primary" @click="editUser">确 定</el-button>
+      </span>
+    </el-dialog>
+    <!-- 分配角色对话框 -->
+    <el-dialog
+      title="分配角色"
+      :visible.sync="assignDialogVisible"
+      width="40%">
+      <el-form :model="assignForm" :rules="rules" ref="assignForm" label-width="70px">
+          <el-form-item label="用户名">
+              <el-tag type="info">{{assignForm.username}}</el-tag>
+          </el-form-item>
+          <el-form-item label="角色列表">
+            <el-select v-model="assignForm.rid" placeholder="请选择角色">
+              <el-option v-for="item in options" :label="item.roleName" :key="item.id" :value="item.id"></el-option>
+            </el-select>
+          </el-form-item>
+      </el-form>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="assignDialogVisible = false">取 消</el-button>
+        <el-button type="primary" @click="assignRole">确 定</el-button>
       </span>
     </el-dialog>
   </div>
@@ -128,7 +149,13 @@ export default {
         mobile: '',
         id: ''
       },
-      addRules: {
+      assignForm: {
+        username: '',
+        id: '',
+        rid: ''
+      },
+      options: [],
+      rules: {
         username: [
           {required: true, message: '请输入用户名', trigger: 'blur'},
           {min: 3, max: 6, message: '长度在 3 到 6 个字符', trigger: 'blur'}
@@ -146,6 +173,7 @@ export default {
       },
       addDialogVisible: false,
       editDialogVisible: false,
+      assignDialogVisible: false,
       total: 0,
       query: '',
       current: 1,
@@ -186,11 +214,11 @@ export default {
       this.current = 1
       this.getList()
     },
-    // 展示添加对话框
+    // 展示添加用户对话框
     showAddDialog () {
       this.addDialogVisible = true
     },
-    // 展示修改对话框
+    // 展示修改用户对话框
     showEditDailog (user) {
       this.editDialogVisible = true
       this.editForm.id = user.id
@@ -198,23 +226,61 @@ export default {
       this.editForm.email = user.email
       this.editForm.mobile = user.mobile
     },
+    // 展示分配角色对话框
+    async showAssignDailog (role) {
+      this.assignForm.id = role.id
+      this.assignForm.username = role.username
+      this.assignDialogVisible = true
+      // 回显用户角色id
+      const res2 = await this.axios.get(`users/${role.id}`)
+      if (res2.data.meta.status === 200) {
+        if (res2.data.data.rid === -1) {
+          this.assignForm.rid = ''
+        } else {
+          this.assignForm.rid = res2.data.data.rid
+        }
+      }
+      // 获取角色列表
+      const res = await this.axios.get('roles')
+      const {meta, data} = res.data
+      if (meta.status === 200) {
+        this.options = data
+      }
+    },
+    // 分配角色
+    async assignRole () {
+      if (!this.assignForm.rid) {
+        this.$message.error('请选择一个角色')
+        return
+      }
+      const res = await this.axios.put(`users/${this.assignForm.id}/role`, {
+        rid: this.assignForm.rid
+      })
+      const {meta} = res.data
+      if (meta.status === 200) {
+        this.assignDialogVisible = false
+        this.getList()
+        this.$message.success('分配角色成功!')
+      } else {
+        this.$message.error('分配角色失败!')
+      }
+    },
     // 添加用户
     addUser () {
-      this.$refs.addForm.validate(valid => {
+      this.$refs.addForm.validate(async valid => {
         if (valid) {
-          this.axios.post('users', this.addForm).then(res => {
-            const {meta} = res.data
-            if (meta.status === 201) {
-              this.addDialogVisible = false
-              this.$refs.addForm.resetFields()
-              this.total++
-              this.current = Math.ceil(this.total / this.pageSize)
-              this.getList()
-              this.$message.success('用户添加成功')
-            } else {
-              this.$message.error(meta.msg)
-            }
-          })
+          const res = await this.axios.post('users', this.addForm)
+          const {meta} = res.data
+          if (meta.status === 201) {
+            this.addDialogVisible = false
+            this.$refs.addForm.resetFields()
+            this.total++
+            this.current = Math.ceil(this.total / this.pageSize)
+            this.getList()
+            this.$message.success('用户添加成功')
+          } else {
+            this.$message.error(meta.msg)
+          }
         } else {
           return false
         }
@@ -222,60 +288,58 @@ export default {
     },
     // 修改用户
     editUser () {
-      this.$refs.editForm.validate(valid => {
+      this.$refs.editForm.validate(async valid => {
         if (valid) {
-          this.axios.put(`users/${this.editForm.id}`, this.editForm).then(res => {
-            const {meta} = res.data
-            if (meta.status === 200) {
-              this.editDialogVisible = false
-              this.$refs.editForm.resetFields()
-              this.getList()
-              this.$message.success('用户修改成功')
-            } else {
-              this.$message.error('用户修改失败')
-            }
-          })
+          const res = await this.axios.put(`users/${this.editForm.id}`, this.editForm)
+          const {meta} = res.data
+          if (meta.status === 200) {
+            this.editDialogVisible = false
+            this.$refs.editForm.resetFields()
+            this.getList()
+            this.$message.success('用户修改成功')
+          } else {
+            this.$message.error('用户修改失败')
+          }
         } else {
           return false
         }
       })
     },
     // 修改用户状态
-    changeState (user) {
-      this.axios.put(`users/${user.id}/state/${user.mg_state}`).then(res => {
-        const {meta: {status}} = res.data
-        if (status === 200) {
-          this.$message.success('用户状态修改成功')
-        } else {
-          this.$message.error('用户状态修改失败')
-        }
-      })
+    async changeState (user) {
+      const res = await this.axios.put(`users/${user.id}/state/${user.mg_state}`)
+      const {meta: {status}} = res.data
+      if (status === 200) {
+        this.$message.success('用户状态修改成功')
+      } else {
+        this.$message.error('用户状态修改失败')
+      }
     },
     // 删除用户
-    deleteUser (user) {
-      this.$confirm('您确定要删除该用户吗?', '温馨提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
-        this.axios.delete(`users/${user.id}`).then(res => {
-          const {meta: {status}} = res.data
-          if (status === 200) {
-            if (this.usersList.length === 1) {
-              this.current--
-            }
-            this.getList()
-            this.$message.success('删除成功!')
-          } else {
-            this.$message.error('删除失败!')
-          }
+    async deleteUser (user) {
+      try {
+        await this.$confirm('您确定要删除该用户吗?', '温馨提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
         })
-      }).catch(() => {
+        const res = await this.axios.delete(`users/${user.id}`)
+        const {meta: {status}} = res.data
+        if (status === 200) {
+          if (this.usersList.length === 1) {
+            this.current--
+          }
+          this.getList()
+          this.$message.success('删除成功!')
+        } else {
+          this.$message.error('删除失败!')
+        }
+      } catch (e) {
         this.$message({
           type: 'info',
           message: '删除已取消'
         })
-      })
+      }
     }
   },
   // 钩子函数
@@ -286,9 +350,7 @@ export default {
 </script>
 <style lang="less">
 // 表格
-.el-table {
-  margin-top: 15px;
-  text-align: center;
+.userTable {
   .cell {
     text-align: center;
   }
@@ -296,13 +358,8 @@ export default {
 // 搜索框
 .input-with-select {
   width: 300px;
-  margin-top: 15px;
-}
-// 面包屑导航
-.el-breadcrumb {
-  background-color: #eee;
-  height: 40px;
-  line-height: 40px;
+  margin-top: 10px;
+  margin-bottom: 10px;
 }
 // 分页器
 .el-pagination {

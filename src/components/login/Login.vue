@@ -37,18 +37,17 @@ export default {
   },
   methods: {
     submitForm () {
-      this.$refs.formData.validate(vaild => {
+      this.$refs.formData.validate(async vaild => {
         if (vaild) {
-          this.axios.post('login', this.form).then(res => {
-            const {data, meta} = res.data
-            if (meta.status === 200) {
-              this.$message.success('登陆成功,欢迎您的到来')
-              localStorage.setItem('shop_token', data.token)
-              this.$router.push('home')
-            } else {
-              this.$message.error('用户名或密码错误')
-            }
-          })
+          const res = await this.axios.post('login', this.form)
+          const {data, meta} = res.data
+          if (meta.status === 200) {
+            this.$message.success('登陆成功,欢迎您的到来')
+            localStorage.setItem('shop_token', data.token)
+            this.$router.push('home')
+          } else {
+            this.$message.error('用户名或密码错误')
+          }
         } else {
           return false
         }
